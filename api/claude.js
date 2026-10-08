@@ -21,13 +21,14 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return fail(res, 405, "method", "POST만 받습니다.");
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  const password = process.env.APP_PASSWORD;
-  const model = process.env.MODEL || DEFAULT_MODEL;
+  // 붙여넣을 때 섞인 앞뒤 공백·줄바꿈 제거
+  const apiKey = (process.env.ANTHROPIC_API_KEY || "").trim();
+  const password = (process.env.APP_PASSWORD || "").trim();
+  const model = (process.env.MODEL || "").trim() || DEFAULT_MODEL;
   if (!apiKey || !password) {
     return fail(res, 500, "server_config", "ANTHROPIC_API_KEY 또는 APP_PASSWORD 환경변수가 없습니다.");
   }
-  if (!sameSecret(req.headers["x-app-key"] || "", password)) {
+  if (!sameSecret(String(req.headers["x-app-key"] || "").trim(), password)) {
     return fail(res, 401, "auth", "비밀번호가 맞지 않습니다.");
   }
 
