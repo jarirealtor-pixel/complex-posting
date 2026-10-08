@@ -1,0 +1,962 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>단지분석 포스팅 생성기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Noto+Sans+KR:wght@400;700&display=swap">
+<style>
+/* Layout: 왼쪽 = 캡처 넣기(한 번 누르면 분석→작성) | 오른쪽 = 검증대(추출 사실·숫자 대조) 위, 원고 아래 */
+:root{
+  --bg:#eef1ee; --panel:#ffffff; --paper:#ffffff; --ink:#1b2420; --muted:#5b6862;
+  --line:#d6ddd8; --soft:#f5f7f5; --accent:#1f6b48; --accent-ink:#ffffff; --accent-soft:#e3efe8;
+  --warn:#a8481f; --warn-soft:#f7e9e2; --mark:#fff1b8; --mark-ink:#5c4400; --shade:rgba(10,16,13,.72);
+  --f-display:"Gowun Batang","Nanum Myeongjo",serif;
+  --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-post:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111513; --panel:#181d1a; --paper:#1c221f; --ink:#e4ebe7; --muted:#97a59e;
+  --line:#2c3531; --soft:#212825; --accent:#5cc48f; --accent-ink:#0d1a13; --accent-soft:#1e3328;
+  --warn:#e8916b; --warn-soft:#3a251c; --mark:#4a3d10; --mark-ink:#ffe9a3; --shade:rgba(0,0,0,.8); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#111513; --panel:#181d1a; --paper:#1c221f; --ink:#e4ebe7; --muted:#97a59e;
+  --line:#2c3531; --soft:#212825; --accent:#5cc48f; --accent-ink:#0d1a13; --accent-soft:#1e3328;
+  --warn:#e8916b; --warn-soft:#3a251c; --mark:#4a3d10; --mark-ink:#ffe9a3; --shade:rgba(0,0,0,.8); color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}
+header h1{font-family:var(--f-display);font-size:24px;margin:0;letter-spacing:-0.01em}
+header p{margin:0;color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:minmax(0,1fr)}}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel h2{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:0;font-weight:600}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label,.field .lbl{font-weight:600;font-size:13px}
+.hint{color:var(--muted);font-size:12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input[type=text],textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:9px 10px}
+textarea{resize:vertical;line-height:1.6}
+input:focus,textarea:focus,select:focus,button:focus-visible,[contenteditable]:focus,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+details{border-top:1px solid var(--line);padding-top:12px}
+details summary{cursor:pointer;font-weight:600;font-size:13px}
+details .inner{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+
+/* 캡처 넣는 곳 */
+.drop{border:2px dashed var(--line);border-radius:10px;padding:18px 14px;text-align:center;background:var(--soft);cursor:pointer;display:flex;flex-direction:column;gap:4px;align-items:center}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{font-size:15px}
+.drop .hint kbd{font-family:inherit;border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--panel)}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}
+.thumb{position:relative;aspect-ratio:3/4;border-radius:6px;overflow:hidden;border:1px solid var(--line);background:var(--soft);max-width:100%}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.thumb .no{position:absolute;left:4px;top:4px;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700;border-radius:4px;padding:0 5px;font-variant-numeric:tabular-nums}
+.thumb .x{position:absolute;right:3px;top:3px;border:0;background:var(--shade);color:#fff;border-radius:4px;padding:0 6px;font-size:13px;line-height:1.5}
+
+/* 유형 */
+.modes{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.modes label{display:flex;align-items:center;justify-content:center;padding:8px 6px;cursor:pointer;background:var(--soft);border-right:1px solid var(--line);font-size:13px;font-weight:600;text-align:center}
+.modes label:last-child{border-right:0}
+.modes input{position:absolute;opacity:0;pointer-events:none}
+.modes label:has(input:checked){background:var(--accent);color:var(--accent-ink)}
+.modes label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:-3px}
+
+button{font:inherit;cursor:pointer;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 12px}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.sm{font-size:12px;padding:4px 9px}
+.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;padding:12px 14px;font-size:15px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.status{font-size:13px;color:var(--muted);min-height:1.2em}
+.status.err{color:var(--warn)}
+.notice{background:var(--warn-soft);color:var(--warn);border-radius:7px;padding:10px 12px;font-size:13px}
+.steps{display:flex;gap:6px;flex-wrap:wrap}
+.step{font-size:12px;border-radius:999px;padding:2px 9px;border:1px solid var(--line);color:var(--muted)}
+.step.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.step.done{background:var(--accent-soft);border-color:transparent;color:var(--ink)}
+.step.done::before{content:"✓ ";color:var(--accent)}
+
+/* 검증대 */
+.out{display:flex;flex-direction:column;gap:14px;min-width:0}
+.verify-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
+.verify-head h2{font-size:15px;letter-spacing:0;color:var(--ink)}
+.prog{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.meta-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+@media (max-width:560px){.meta-row{grid-template-columns:minmax(0,1fr)}}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:13px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft)}
+th,.srcbtn{white-space:nowrap}
+td.ck{width:44px}
+td.src{width:76px}
+tr:last-child td{border-bottom:0}
+td.item{width:130px;color:var(--muted);font-size:12px}
+td.ck{width:34px;text-align:center}
+td.src{width:62px}
+td.del{width:34px}
+td input[type=text]{padding:5px 7px;font-size:13px}
+tr.unsure td.val input{background:var(--mark);color:var(--mark-ink)}
+tr.checked td.val input{border-color:var(--accent)}
+.srcbtn{font-size:12px;padding:2px 7px;font-variant-numeric:tabular-nums}
+.delbtn{border:0;background:none;color:var(--muted);padding:2px 6px}
+.gaps{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.gap-chip{font-size:12px;border-radius:999px;padding:2px 9px;background:var(--warn-soft);color:var(--warn)}
+.numcheck{border-radius:8px;padding:10px 12px;font-size:13px;display:flex;flex-direction:column;gap:6px}
+.numcheck.ok{background:var(--accent-soft)}
+.numcheck.bad{background:var(--mark);color:var(--mark-ink)}
+.numcheck ul{margin:0;padding-left:18px}
+.numcheck b{font-variant-numeric:tabular-nums}
+
+/* 원고 */
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.badge{font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px;background:var(--warn-soft);color:var(--warn)}
+.badge.live{background:var(--accent-soft);color:var(--accent)}
+.meter{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.meter .todo{color:var(--mark-ink);background:var(--mark);border-radius:4px;padding:1px 6px;margin-left:6px}
+.paper{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:clamp(18px,4vw,44px);font-family:var(--f-post);font-size:16px;line-height:1.85;min-width:0}
+.paper .banner{border:1px solid var(--line);background:var(--soft);border-radius:6px;padding:10px 12px;font-size:14px;line-height:1.6;margin-bottom:26px;word-break:keep-all;white-space:pre-line}
+.paper .ptitle{font-size:24px;font-weight:700;line-height:1.45;margin:0 0 26px;text-wrap:balance;word-break:keep-all}
+.paper p{margin:0}
+.paper .block{margin-bottom:34px}
+.paper h3{font-size:19px;font-weight:700;margin:0 0 10px;line-height:1.5;word-break:keep-all}
+.paper .body{word-break:keep-all;border-radius:4px}
+.paper [contenteditable]:hover{background:var(--soft)}
+.sec-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-family:var(--f-ui)}
+.sec-tools .cnt{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sec-tools .cnt.off{color:var(--warn)}
+.sec-tools .todo{font-size:12px;color:var(--mark-ink);background:var(--mark);border-radius:4px;padding:1px 6px}
+.faq-title{font-size:19px;font-weight:700;margin-bottom:18px}
+.faq .q{font-weight:700;margin-bottom:6px}
+.faq .a{margin-bottom:24px}
+.contact{border-top:1px solid var(--line);padding-top:18px;margin-top:6px;margin-bottom:24px;white-space:pre-line;font-size:15px}
+.tags{display:flex;flex-wrap:wrap;gap:6px 10px;color:var(--accent);font-size:15px}
+.skel{font-family:var(--f-ui);color:var(--muted)}
+.skel h4{font-family:var(--f-post);color:var(--ink);font-size:17px;margin:0 0 4px}
+.skel ol{margin:12px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+.skel li span{color:var(--muted);font-size:13px}
+
+.hist{display:flex;flex-direction:column;gap:6px}
+.hist button{text-align:left;display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.hist .tag{font-size:11px;border-radius:4px;padding:0 5px;background:var(--accent-soft);margin-right:6px}
+.hist time{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+#fallback textarea{min-height:160px;font-size:13px}
+
+/* 이미지 확대 */
+.viewer{position:fixed;inset:0;background:var(--shade);display:flex;flex-direction:column;align-items:center;gap:10px;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));z-index:10;overflow:auto}
+.viewer img{max-width:min(100%,1000px);height:auto;border-radius:6px;background:#fff}
+.viewer .vbar{display:flex;gap:8px;align-items:center;color:#fff;position:sticky;top:0}
+.viewer .vbar button{background:var(--panel);color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.gate{flex-direction:row;flex-wrap:wrap;align-items:flex-end;gap:10px}
+.gate .field{flex:1 1 220px}
+.gate .msg{flex-basis:100%;font-size:13px}
+.gate .msg.err{color:var(--warn)}
+.linkbtn{border:0;background:none;color:var(--muted);font-size:12px;padding:2px 4px;text-decoration:underline}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>단지분석 포스팅 생성기</h1>
+    <p>홍보자료 캡처를 넣고 한 번 누르면 단지 정보를 읽어 글까지 씁니다. 사람은 검증만 합니다. <button type="button" class="linkbtn" id="lockBtn" hidden>잠그기</button></p>
+  </header>
+
+  <form class="panel gate" id="gate" hidden autocomplete="on">
+    <div class="field">
+      <label for="pw">사무소 비밀번호</label>
+      <input type="password" id="pw" autocomplete="current-password" placeholder="Vercel에 설정한 APP_PASSWORD">
+    </div>
+    <button type="submit" class="primary" id="pwBtn">들어가기</button>
+    <span class="msg" id="gateMsg">이 기기에서 한 번만 입력하면 다음부터는 바로 열립니다.</span>
+  </form>
+
+  <div class="grid">
+    <!-- 왼쪽: 넣기 -->
+    <form class="panel" id="form" autocomplete="off">
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="홍보자료 캡처 넣기">
+        <strong>홍보자료 캡처 넣기</strong>
+        <span class="hint">끌어다 놓기 · 클릭해서 고르기 · 캡처 후 <kbd>Ctrl</kbd>+<kbd>V</kbd></span>
+        <span class="hint">모집공고, 분양 홈페이지, 브로슈어, 입주 안내문, 시세 화면 모두 됩니다</span>
+      </div>
+      <input type="file" id="images" accept="image/*" multiple hidden>
+      <div class="thumbs" id="thumbs"></div>
+      <div class="notice" id="noImg" hidden>이 화면에서는 이미지를 읽을 수 없습니다. 아래 ‘텍스트 자료’에 내용을 붙여넣으면 같은 방식으로 진행합니다.</div>
+
+      <div class="actions">
+        <button type="submit" class="primary" id="goBtn" style="flex:1">분석하고 포스팅 쓰기</button>
+        <button type="button" id="stopBtn" hidden>중지</button>
+      </div>
+      <div class="steps" id="steps">
+        <span class="step" data-s="read">캡처 읽기</span>
+        <span class="step" data-s="write">글 쓰기</span>
+        <span class="step" data-s="check">숫자 대조</span>
+      </div>
+      <div class="status" id="status" role="status"></div>
+      <div class="notice" id="noSample" hidden></div>
+
+      <details id="textBox">
+        <summary>텍스트 자료 추가 (선택)</summary>
+        <div class="inner">
+          <textarea id="notes" rows="6" placeholder="캡처에 없는 내용이나 현장 메모를 적으면 함께 반영합니다. 예: 84㎡ 전세 호가 5억 초반(10월 초 기준)"></textarea>
+        </div>
+      </details>
+
+      <details id="optBox">
+        <summary>글 옵션</summary>
+        <div class="inner">
+          <div class="field">
+            <span class="lbl" id="modeLbl">글 유형</span>
+            <div class="modes" role="radiogroup" aria-labelledby="modeLbl">
+              <label><input type="radio" name="mode" id="mode-auto" value="auto" checked>자동 판단</label>
+              <label><input type="radio" name="mode" id="mode-presale" value="presale">분양 단지</label>
+              <label><input type="radio" name="mode" id="mode-movein" value="movein">입주 단지</label>
+            </div>
+            <span class="hint" id="modeHint">캡처 내용을 보고 분양·입주를 판단합니다.</span>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="sections">소제목 수</label>
+              <select id="sections">
+                <option value="6">6개</option><option value="7">7개</option><option value="8">8개</option>
+                <option value="9" selected>9개 (원본 형식)</option><option value="10">10개</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="faqCount">Q&amp;A 수</label>
+              <select id="faqCount">
+                <option value="0">없음</option><option value="2">2개</option><option value="3" selected>3개</option><option value="4">4개</option><option value="5">5개</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="gap">자료에 없는 항목은</label>
+            <select id="gap">
+              <option value="skip" selected>단락을 빼고 다른 항목으로 채움</option>
+              <option value="mark">[확인필요] 표시로 자리만 남김</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="voice">글쓴이 시점</label>
+            <select id="voice">
+              <option value="info" selected>정보형 3인칭 (원본 형식)</option>
+              <option value="broker">현장 중개사 시점</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="banner">상단 광고 문구</label>
+            <textarea id="banner" rows="2" placeholder="예: [마감 임박] 단지명 ☎ 문의 0000-0000 ✔️중도금 무이자"></textarea>
+          </div>
+          <div class="field">
+            <label for="contact">하단 연락처</label>
+            <textarea id="contact" rows="2" placeholder="예: 분양·입주 상담 ☎ 000-0000-0000"></textarea>
+          </div>
+        </div>
+      </details>
+
+      <details id="histBox">
+        <summary>최근 생성 기록</summary>
+        <div class="inner hist" id="hist"></div>
+      </details>
+      <button type="button" id="resetBtn">새 단지 시작</button>
+    </form>
+
+    <!-- 오른쪽: 검증 + 원고 -->
+    <section class="out">
+      <div class="panel" id="verify">
+        <div class="verify-head">
+          <h2>검증대</h2>
+          <div class="actions">
+            <span class="prog" id="prog"></span>
+            <button type="button" class="sm" id="checkAll">전부 확인 처리</button>
+            <button type="button" class="sm" id="addFact">항목 추가</button>
+          </div>
+        </div>
+        <div class="meta-row">
+          <div class="field"><label for="complex">단지명</label><input type="text" id="complex"></div>
+          <div class="field"><label for="keywords">검색 키워드</label><input type="text" id="keywords" placeholder="쉼표로 구분"></div>
+        </div>
+        <div class="gaps" id="gaps"></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>확인</th><th>항목</th><th>읽어낸 값</th><th>출처</th><th></th></tr></thead>
+            <tbody id="facts"></tbody>
+          </table>
+        </div>
+        <span class="hint">노란 칸은 글자가 흐려 확실하지 않은 값입니다. 출처 번호를 누르면 원본 캡처가 열립니다. 값을 고친 뒤 ‘고친 자료로 다시 쓰기’를 누르세요.</span>
+        <div class="numcheck" id="numcheck" hidden></div>
+        <div class="actions"><button type="button" id="rewriteAll" disabled>고친 자료로 다시 쓰기</button></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="actions">
+          <span class="badge" id="badge">예시 원고</span>
+          <span class="meter" id="meter"></span>
+        </div>
+        <div class="actions">
+          <button type="button" id="copyTitle">제목 복사</button>
+          <button type="button" id="copyRich">본문 복사 (에디터용)</button>
+          <button type="button" id="copyPlain">텍스트 복사</button>
+        </div>
+      </div>
+      <div class="panel" id="fallback" hidden>
+        <h2>자동 복사가 막혀 있습니다. 아래 내용을 전체 선택해 복사하세요</h2>
+        <textarea id="fallbackText" readonly></textarea>
+        <div class="actions"><button type="button" id="closeFallback">닫기</button></div>
+      </div>
+      <article class="paper" id="paper"></article>
+    </section>
+  </div>
+</div>
+
+<div class="viewer" id="viewer" hidden>
+  <div class="vbar"><span id="vtitle"></span><button type="button" id="vclose">닫기</button></div>
+  <img id="vimg" alt="원본 캡처">
+</div>
+
+<script>
+(function(){
+"use strict";
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; };
+
+/* ---------- 글 유형 ---------- */
+const ITEMS = ["단지명","위치","규모","시공사","주택형","배치·조경","주차","교통","교통 계획","학교","상권·편의","공원","개발계획","분양가","주변 시세","매매 시세","전월세 시세","커뮤니티","청약·계약 조건","입주 시기","주변 공급","기타"];
+const MODES = {
+  presale: {
+    label: "분양",
+    covers: [["규모",/규모|세대/],["주택형",/주택형|㎡|타입/],["교통",/교통/],["학교",/학교/],["분양가",/분양가/],["주변 시세",/주변 시세|시세/],["커뮤니티",/커뮤니티/],["청약 조건",/청약|계약|전매|중도금/],["입주 시기",/입주/]],
+    plan: [["사업 규모·위치","세대수, 블록·동·층, 주소"],["단지 배치·주택형","배치, 조경, 주차, 전용면적 구성"],["핵심 교통","현재 노선과 계획 노선, 목표 시기"],["학교·상권·생활권","학교, 상권, 공원"],["추가 개발계획","철도·산업단지 등 진행 중인 계획"],["주변 시세와 분양가 비교","비교 단지와의 차이, 비교 시 유의점"],["커뮤니티·특화시설","단지 안 편의시설"],["배후수요와 공급량","장점과 입주 물량 리스크를 함께"],["결론","현재와 미래 요소, 계획 변경 가능성 확인 권유"]],
+    intro: `정확히 3문장. ①시장·수요 흐름(수도권 수요, 직주근접 등 일반론) ②이 지역 입지의 장점 한 가지(끝을 '~곳인데요.'처럼 '~는데요'로) ③"{단지명}의 ○○와 ○○, ○○를 살펴봤습니다." 형식의 예고.`,
+    order: `사업 규모·위치 → 단지 배치·주택형 → 핵심 교통 → 학교·상권·생활권 → 추가 개발호재·철도망 → 주변 시세와 분양가 비교 → 커뮤니티·특화시설 → 배후수요와 공급량(장점과 함께 입주 물량·일정 리스크를 균형 있게) → 마지막 단락은 결론: 현재와 미래 요소를 함께 보라는 정리 + 계획 변경 가능성·실제 진행 확인과 모집공고 세부 조건 확인을 권하는 신중한 마무리.`,
+    faq: `주차, 입주 예정 시기, 신설 학교 거리, 전매 제한, 청약 자격, 중도금 조건처럼 본문에서 다 못 한 세부 사실`,
+    extra: `- 가격 비교 단락에서는 비교 대상과의 차이를 사실대로만 적고, 연식·입지 차이 등 비교 시 유의점을 한 문장 넣는다.`
+  },
+  movein: {
+    label: "입주",
+    covers: [["규모",/규모|세대/],["입주 시기",/입주/],["주택형",/주택형|㎡|타입/],["교통",/교통/],["학교",/학교/],["커뮤니티",/커뮤니티/],["매매 시세",/매매|실거래/],["전월세",/전세|월세|전월세/]],
+    plan: [["단지 개요와 입주 현황","세대수, 시공사, 입주 시작·지정기간"],["단지 배치·주택형·주차","동 배치와 조경, 면적 구성"],["교통","현재 이용 노선, 진행 중인 계획"],["학교·생활권","배정 학교, 상권, 공원"],["커뮤니티 운영","운영 중이거나 오픈 예정인 시설"],["분양가 대비 매매 시세","면적별 호가·실거래, 기준 시점"],["전월세 시세와 입주장 물량","전세·월세 수준, 물량 영향"],["주변 개발 진행","계획의 현재 진행 단계"],["결론","매수·임차 체크포인트, 실거래 확인 권유"]],
+    intro: `정확히 3문장. ①입주를 시작했거나 입주가 진행 중인 단지에 대한 관심(실수요·전세 수요 등 일반론) ②이 지역 입지의 장점 한 가지(끝을 '~곳인데요.'처럼 '~는데요'로) ③"{단지명}의 입주 현황과 ○○, ○○를 정리했습니다." 형식의 예고.`,
+    order: `단지 개요와 입주 현황(세대수·시공사·입주 시작 시기·입주지정기간) → 단지 배치·조경·주택형·주차 → 교통 → 학교 배정·상권·생활권 → 커뮤니티 운영 현황 → 분양가 대비 현재 매매 시세 → 전월세 시세와 입주장 물량(물량이 몰릴 때 전세가 흐름을 균형 있게) → 주변 개발 진행 상황 → 마지막 단락은 결론: 매수자·세입자 각각이 확인할 점을 정리하고, 시세는 수시로 바뀌므로 실거래가와 현장 매물을 직접 확인하라는 신중한 마무리.`,
+    faq: `입주지정기간, 면적별 전세 시세, 주차, 배정 학교, 잔금대출·사전점검·하자보수 접수처럼 입주 시점에 자주 묻는 세부 사실`,
+    extra: `- 시세 숫자에는 자료에 있는 기준 시점을 함께 쓴다. 기준 시점이 없으면 '현재 호가 기준' 정도로만 쓴다.
+- 앞으로 오른다·내린다는 전망을 단정하지 않는다. 입주장 전세 물량 영향은 일반적인 경향으로만 언급한다.`
+  }
+};
+
+/* ---------- 예시 ---------- */
+const EX_FACTS = [
+  ["위치","오산시 양산동 223번지 일원"],["규모","1블록 지하2층~지상27층 13개동 1,069세대 / 2블록 9개동 714세대 / 총 1,783세대"],
+  ["배치·조경","1·2블록이 도로를 사이에 두고 마주함, 주차 대부분 지하, 지상 조경·쉼터·어린이놀이터"],
+  ["주택형","전용 75㎡ ~ 166㎡(펜트하우스)"],["주차","가구당 약 1.51대"],
+  ["교통","1호선 병점역 인근"],["교통 계획","GTX-C 병점역 연결 계획(2028년 개통 목표), 개통 시 삼성역 20분대 예상 / 병점~동탄 1호선 연장 계획 / 동탄 트램 2공구 망포역~오산역(2028년 목표)"],
+  ["학교","반경 약 1km 세마중·세마고 / 초·중학교 신설 예정(약 500m, 중학교 2027년 개교 목표)"],
+  ["상권·편의","병점역 상권, 하나로마트"],["공원","단지 앞 약 1만 평 체육공원 계획"],
+  ["주변 시세","전용84 기준 병점역 생활권 약 7억5,400만~8억5,000만 / 망포 약 11억8,500만~13억 / 동탄 11억5,000만~15억"],
+  ["분양가","7억3,100만~8억1,900만"],
+  ["커뮤니티","피트니스, 실내골프연습장, 사우나, 카페, 사운드 챔버, 미디어 챔버, 도서관(교보문고 연계), 카페(파리크라상 연계)"],
+  ["주변 공급","향후 약 1만 세대 주거시설 예정"],["입주 시기","2029년 9월 예정"]
+].map(([item,value],k)=>({id:"x"+k,item,value,src:0,sure:true,ok:false}));
+const EXAMPLE_POST = {
+  mode:"presale",
+  title: "오산 헤리티지 자이 분양가·입지 정리, 병점역 GTX-C 생활권",
+  intro: "수도권 남부에서 직장과 가까운 신축 주거지를 찾는 수요가 꾸준히 늘고 있습니다. 병점역 일대는 주변 산업단지와 업무지구로 오가기 쉬워 실거주 관심이 이어지는 곳인데요. 오산 헤리티지 자이의 규모와 입지, 분양가를 차례로 정리했습니다.",
+  sections: [
+    {heading:"2개 블록, 총 1,783세대 규모", body:"오산 헤리티지 자이는 오산시 양산동 223번지 일원에 조성되는 신축 단지입니다. 1블록은 지하 2층~지상 27층, 13개 동 1,069세대로 계획됐어요. 2블록은 9개 동에 714세대가 들어서는데요. 두 블록을 합하면 총 1,783세대 규모가 됩니다."},
+    {heading:"도로를 마주한 두 단지와 주택형 구성", body:"두 블록은 도로 하나를 사이에 두고 나란히 자리합니다. 주차장을 대부분 지하에 두어 지상은 조경과 놀이터, 휴게공간 위주로 꾸밀 예정이에요. 전용면적은 75㎡부터 166㎡ 펜트하우스까지 마련되는데요. 중형부터 대형까지 가족 구성에 맞춰 고를 수 있는 구성입니다."},
+    {heading:"1호선 병점역과 GTX-C 계획", body:"인근 병점역에서는 수도권 전철 1호선을 이용할 수 있습니다. GTX-C 노선을 병점역까지 잇는 계획도 잡혀 있어요. 자료에 따르면 개통 목표 시점은 2028년인데요. 계획대로 운행되면 삼성역까지 20분대 이동이 가능할 것으로 예상됩니다."},
+    {heading:"학교와 역세권 상권이 가까운 생활권", body:"단지 반경 약 1km 안에 세마중학교와 세마고등학교 등 교육시설이 있습니다. 초등학교와 중학교 신설도 단지 가까이에 예정돼 있어요. 병점역 주변 상권과 하나로마트를 이용할 수 있는데요. 단지 앞에는 약 1만 평 규모의 체육공원도 계획되어 있습니다."},
+    {heading:"1호선 연장과 동탄 트램 추진", body:"GTX-C 외에 병점역에서 동탄역으로 이어지는 1호선 연장 계획도 있습니다. 동탄 도시철도 트램 사업 역시 추진되고 있어요. 2공구는 망포역에서 오산역 구간을 잇는 것으로 계획됐는데요. 자료상 개통 목표는 2028년으로 안내됩니다."},
+    {heading:"주변 시세와 비교한 공급금액", body:"병점역 생활권의 전용 84㎡는 약 7억5,400만~8억5,000만 원 선으로 안내됩니다. 망포는 약 11억8,500만~13억 원, 동탄은 11억5,000만~15억 원 수준이에요. 이 단지의 공급금액은 7억3,100만~8억1,900만 원으로 책정됐는데요. 비교 단지의 연식과 입지 차이도 함께 감안해 보는 것이 좋겠습니다."},
+    {heading:"생활 편의를 높인 단지 내 커뮤니티", body:"실거주라면 단지 안 편의시설도 꼼꼼히 따져볼 부분입니다. 피트니스센터와 실내 골프연습장, 사우나, 카페 등이 들어설 예정이에요. 음악과 영상 감상을 위한 사운드 챔버와 미디어 챔버도 계획돼 있는데요. 도서관은 교보문고, 카페는 파리크라상과 연계해 운영하는 것으로 안내됩니다."},
+    {heading:"배후수요와 공급 물량 점검", body:"단지 주변에는 앞으로 약 1만 세대 규모의 주거시설이 더 들어설 전망입니다. 인근 산업단지와 교통 계획, 브랜드 인지도는 주거 선호에 긍정적으로 작용할 수 있어요. 다만 입주가 한 시기에 몰리면 전월세 가격이 일시적으로 흔들릴 수 있는데요. 공급 일정과 시장 흐름을 함께 확인하는 것이 필요합니다."},
+    {heading:"현재와 앞으로의 변화를 함께 볼 단지", body:"오산 헤리티지 자이는 지금의 병점역 생활권과 앞으로 들어설 학교·공원·광역교통을 함께 따져볼 수 있는 곳입니다. 예정된 시설이 많은 만큼 일정이 바뀔 가능성도 있어요. 계획 발표만으로 판단하기보다 실제 사업 진행 상황을 확인하는 편이 안전한데요. 청약 전 입주자 모집공고의 세부 조건도 꼭 살펴보시기 바랍니다."}
+  ],
+  faqTitle: "Q. 알아두면 좋은 내용",
+  faq: [
+    {q:"Q1. 주차공간은 어느 정도로 계획됐나요?", a:"가구당 약 1.51대 수준으로 주차장이 마련될 예정입니다."},
+    {q:"Q2. 지금 바로 입주할 수 있는 단지인가요?", a:"아직 입주 전 단지이며 예정 시기는 2029년 9월입니다. 정확한 일정은 공사 진행에 따라 확정됩니다."},
+    {q:"Q3. 신설 예정 학교는 얼마나 가까운가요?", a:"단지에서 약 500m 거리로 안내됩니다. 중학교는 2027년 개교를 목표로 하고 있습니다."}
+  ],
+  tags: ["#오산헤리티지자이","#병점역아파트","#오산신축분양"]
+};
+
+/* ---------- 상태 ---------- */
+let post = JSON.parse(JSON.stringify(EXAMPLE_POST));
+let facts = JSON.parse(JSON.stringify(EX_FACTS));
+let isExample = true;
+let detectedMode = "presale";
+let images = [];            // {file, url}
+let factsStale = true;      // 캡처가 바뀌어 다시 읽어야 하는지
+let factsEdited = false;
+let ready=false, ctl=null, busy=false;
+const imgLimits={maxCount:4};
+const AKEY="posting-gen-appkey-v1";
+let seq = 0;
+const HKEY="posting-gen-history-v2", OKEY="posting-gen-opts-v3";
+const store = {
+  get(k){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+$("complex").value = "오산 헤리티지 자이";
+$("keywords").value = "병점역 아파트, 오산 신축 분양";
+
+/* 옵션 기억 (이 브라우저에만) */
+const OPT_IDS = ["sections","faqCount","gap","voice","banner","contact"];
+const savedOpts = store.get(OKEY);
+if(savedOpts){ OPT_IDS.forEach(id=>{ if(savedOpts[id]!=null) $(id).value=savedOpts[id]; }); if(savedOpts.mode && $("mode-"+savedOpts.mode)) $("mode-"+savedOpts.mode).checked=true; }
+const saveOpts = () => { const o={mode:modeChoice()}; OPT_IDS.forEach(id=>o[id]=$(id).value); store.set(OKEY,o); };
+OPT_IDS.forEach(id=>$(id).addEventListener("input",()=>{ saveOpts(); if(id==="banner"||id==="contact") render(); }));
+
+const modeChoice = () => document.querySelector('input[name=mode]:checked').value;
+const effMode = () => { const c=modeChoice(); return c==="auto" ? detectedMode : c; };
+document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener("change",()=>{ saveOpts(); updateModeHint(); renderGaps(); if(!post) render(); }));
+function updateModeHint(){
+  $("modeHint").textContent = modeChoice()==="auto"
+    ? `캡처 내용을 보고 판단합니다. 현재 판단: ${MODES[detectedMode].label} 단지`
+    : `${MODES[effMode()].label} 단지 구성으로 씁니다.`;
+}
+
+/* ---------- 캡처 넣기 ---------- */
+const drop=$("drop"), picker=$("images");
+drop.addEventListener("click",()=>picker.click());
+drop.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); picker.click(); }});
+picker.addEventListener("change",e=>{ addImages(e.target.files); picker.value=""; });
+["dragenter","dragover"].forEach(t=>drop.addEventListener(t,e=>{ e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(t=>drop.addEventListener(t,e=>{ e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop",e=>addImages(e.dataTransfer.files));
+document.addEventListener("paste",e=>{
+  const fs = Array.from((e.clipboardData&&e.clipboardData.files)||[]).filter(f=>f.type.startsWith("image/"));
+  if(fs.length){ e.preventDefault(); addImages(fs); }
+});
+function addImages(list){
+  const fs = Array.from(list||[]).filter(f=>f.type && f.type.startsWith("image/"));
+  if(!fs.length) return;
+  fs.forEach(f=>images.push({file:f, url:URL.createObjectURL(f)}));
+  factsStale = true; renderThumbs();
+  setStatus(`캡처 ${images.length}장 준비됨. ‘분석하고 포스팅 쓰기’를 누르세요.`);
+}
+function renderThumbs(){
+  const box=$("thumbs"); box.replaceChildren();
+  images.forEach((im,k)=>{
+    const t=el("div","thumb");
+    const img=el("img"); img.src=im.url; img.alt=`캡처 ${k+1}`; img.addEventListener("click",()=>openViewer(k+1));
+    const no=el("span","no",String(k+1));
+    const x=el("button","x","×"); x.type="button"; x.setAttribute("aria-label",`캡처 ${k+1} 빼기`);
+    x.addEventListener("click",()=>{ URL.revokeObjectURL(im.url); images.splice(k,1); factsStale=true; renderThumbs(); });
+    t.append(img,no,x); box.append(t);
+  });
+}
+function openViewer(n){
+  const im = images[n-1]; if(!im) return;
+  $("vimg").src = im.url; $("vtitle").textContent = `캡처 ${n}번`; $("viewer").hidden=false; $("vclose").focus();
+}
+$("vclose").addEventListener("click",()=>{ $("viewer").hidden=true; });
+$("viewer").addEventListener("click",e=>{ if(e.target.id==="viewer") $("viewer").hidden=true; });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("viewer").hidden=true; });
+
+/* 긴 캡처는 잘라서 보냄: 한 장이 작게 줄어들면 글자를 못 읽기 때문 */
+async function toTiles(file){
+  let bmp; try{ bmp = await createImageBitmap(file); }catch(e){ return [file]; }
+  const w=bmp.width, h=bmp.height, tw=Math.min(w,1100), sc=tw/w, sh=Math.round(h*sc), th=Math.round(tw*1.3);
+  if(sh<=th*1.25 && w<=1400){ bmp.close && bmp.close(); return [file]; }
+  const out=[], ov=50, n=Math.max(1,Math.ceil(sh/th));
+  for(let i=0;i<n;i++){
+    const y0=Math.max(0,i*th-ov), hh=Math.min(th+ov, sh-y0); if(hh<40) break;
+    const cv=document.createElement("canvas"); cv.width=tw; cv.height=hh;
+    const cx=cv.getContext("2d"); cx.fillStyle="#fff"; cx.fillRect(0,0,tw,hh);
+    cx.drawImage(bmp, 0, y0/sc, w, hh/sc, 0, 0, tw, hh);
+    const b = await new Promise(r=>cv.toBlob(r,"image/jpeg",0.9)); if(b) out.push(b);
+  }
+  bmp.close && bmp.close();
+  return out.length?out:[file];
+}
+
+/* ---------- 검증대 ---------- */
+function renderFacts(){
+  const tb=$("facts"); tb.replaceChildren();
+  facts.forEach((f,k)=>{
+    const tr=el("tr"); if(!f.sure) tr.classList.add("unsure"); if(f.ok) tr.classList.add("checked");
+    const c1=el("td","ck"); const cb=el("input"); cb.type="checkbox"; cb.id="ok-"+f.id; cb.checked=!!f.ok; cb.setAttribute("aria-label",f.item+" 확인");
+    cb.addEventListener("change",()=>{ f.ok=cb.checked; tr.classList.toggle("checked",f.ok); updateProg(); }); c1.append(cb);
+    const c2=el("td","item"); const sel=el("select"); sel.id="it-"+f.id; sel.setAttribute("aria-label","항목");
+    const opts = ITEMS.includes(f.item)?ITEMS:[f.item,...ITEMS];
+    opts.forEach(o=>{ const op=el("option",null,o); op.value=o; if(o===f.item) op.selected=true; sel.append(op); });
+    sel.style.padding="4px 6px"; sel.style.fontSize="12px";
+    sel.addEventListener("change",()=>{ f.item=sel.value; markEdited(); renderGaps(); }); c2.append(sel);
+    const c3=el("td","val"); const inp=el("input"); inp.type="text"; inp.id="v-"+f.id; inp.value=f.value; inp.setAttribute("aria-label",f.item+" 값");
+    inp.addEventListener("input",()=>{ f.value=inp.value; f.sure=true; tr.classList.remove("unsure"); markEdited(); }); c3.append(inp);
+    const c4=el("td","src");
+    if(f.src>0){ const sb=el("button","srcbtn",`캡처 ${f.src}`); sb.type="button"; sb.disabled=!images[f.src-1]; sb.addEventListener("click",()=>openViewer(f.src)); c4.append(sb); }
+    else c4.append(el("span","hint", f.src===0 && isExample ? "예시" : "직접"));
+    const c5=el("td","del"); const d=el("button","delbtn","×"); d.type="button"; d.setAttribute("aria-label",f.item+" 삭제");
+    d.addEventListener("click",()=>{ facts.splice(k,1); markEdited(); renderFacts(); }); c5.append(d);
+    tr.append(c1,c2,c3,c4,c5); tb.append(tr);
+  });
+  if(!facts.length){ const tr=el("tr"); const td=el("td",null,"캡처를 넣고 ‘분석하고 포스팅 쓰기’를 누르면 읽어낸 사실이 여기에 정리됩니다."); td.colSpan=5; td.className="hint"; tr.append(td); tb.append(tr); }
+  updateProg(); renderGaps();
+}
+function markEdited(){ factsEdited=true; $("rewriteAll").disabled = !ready || busy || !facts.length; }
+function updateProg(){
+  const n=facts.length, ok=facts.filter(f=>f.ok).length, un=facts.filter(f=>!f.sure).length;
+  $("prog").textContent = n ? `확인 ${ok}/${n}${un?` · 불확실 ${un}`:""}` : "";
+}
+$("checkAll").addEventListener("click",()=>{ facts.forEach(f=>f.ok=true); renderFacts(); });
+$("addFact").addEventListener("click",()=>{ facts.push({id:"n"+(++seq),item:"기타",value:"",src:-1,sure:true,ok:false}); renderFacts(); const last=facts[facts.length-1]; const i=$("v-"+last.id); if(i) i.focus(); });
+function renderGaps(){
+  const box=$("gaps"); box.replaceChildren();
+  if(!facts.length) return;
+  const txt = facts.map(f=>f.item+" "+f.value).join("\n") + "\n" + $("notes").value;
+  const miss = MODES[effMode()].covers.filter(([,re])=>!re.test(txt)).map(([n])=>n);
+  if(!miss.length) return;
+  box.append(el("span","hint",`${MODES[effMode()].label} 글에 자주 들어가는데 자료에 없는 항목:`));
+  miss.forEach(m=>box.append(el("span","gap-chip",m)));
+}
+$("notes").addEventListener("input",()=>{ renderGaps(); markEdited(); });
+["complex","keywords"].forEach(id=>$(id).addEventListener("input",markEdited));
+
+/* 숫자 대조: 원고 속 숫자가 검증대 자료에 있는지 */
+const numsOf = s => (String(s||"").replace(/Q\d+\./g,"").match(/\d[\d,.]*/g)||[]).map(t=>t.replace(/[,.]+$/,"").replace(/,/g,"")).filter(t=>t && !(t.length===1));
+function sourceText(){ return facts.map(f=>f.value).join(" ")+" "+$("notes").value+" "+$("complex").value; }
+function runNumCheck(){
+  const box=$("numcheck");
+  if(!post || isExample){ box.hidden=true; return; }
+  const have = new Set(numsOf(sourceText()));
+  const misses=[];
+  const scan=(label,text)=>{ numsOf(text).forEach(n=>{ if(!have.has(n) && !misses.some(m=>m.n===n)){
+    const i=text.replace(/,/g,"").indexOf(n); const raw=text; // 문맥 조각
+    const pos = raw.search(new RegExp(n.split("").join(",?")));
+    const snip = raw.slice(Math.max(0,pos-14), pos+n.length+16).trim();
+    misses.push({n,label,snip}); } }); };
+  scan("제목",post.title); scan("서론",post.intro);
+  post.sections.forEach(s=>scan(s.heading, s.heading+" "+s.body));
+  (post.faq||[]).forEach(f=>scan(f.q, f.q+" "+f.a));
+  box.hidden=false; box.replaceChildren();
+  if(!misses.length){ box.className="numcheck ok"; box.append(el("span",null,"원고의 숫자가 모두 검증대 자료에 있습니다.")); stepMark("check","done"); return; }
+  box.className="numcheck bad";
+  box.append(el("b",null,`자료에서 찾지 못한 숫자 ${misses.length}개 — 원고에서 직접 확인하세요`));
+  const ul=el("ul"); misses.slice(0,12).forEach(m=>{ const li=el("li"); li.append(el("b",null,m.n)); li.append(document.createTextNode(` · ${m.label.slice(0,18)} — “…${m.snip}…”`)); ul.append(li); });
+  box.append(ul); stepMark("check","done");
+}
+
+/* ---------- 원고 렌더링 ---------- */
+const TODO_RE=/\[확인필요[^\]]*\]/g;
+const todoCount = s => ((s||"").match(TODO_RE)||[]).length;
+function editable(node, getter, setter){
+  node.contentEditable="true"; node.spellcheck=false; node.textContent=getter();
+  node.addEventListener("input",()=>{ setter(node.textContent); updateMeter(); const b=node.closest(".block"); if(b) refreshTools(b); });
+  node.addEventListener("blur",runNumCheck);
+  node.addEventListener("paste",e=>{ e.preventDefault(); const t=(e.clipboardData||window.clipboardData).getData("text/plain"); document.execCommand("insertText",false,t); });
+}
+function setCnt(c,t){ const n=(t||"").length; c.textContent=n+"자"; c.classList.toggle("off",n<120||n>260); c.title="권장 150~230자"; }
+function refreshTools(b){
+  const i=Number(b.dataset.i); if(isNaN(i)||!post.sections[i]) return; const s=post.sections[i];
+  setCnt(b.querySelector(".cnt"), s.body);
+  const td=b.querySelector(".todo"), n=todoCount(s.heading+s.body); td.hidden=!n; td.textContent=`확인필요 ${n}`;
+}
+function renderSkeleton(p){
+  const m=MODES[effMode()], box=el("div","skel");
+  box.append(el("h4",null,`${m.label} 단지 포스팅 구성`));
+  box.append(el("p",null,"캡처를 넣고 ‘분석하고 포스팅 쓰기’를 누르면 아래 순서로 글이 써집니다."));
+  const ol=el("ol"); m.plan.forEach(([n,d])=>{ const li=el("li",null,n+" "); li.append(el("span",null,"— "+d)); ol.append(li); });
+  const li=el("li",null,"Q. 알아두면 좋은 내용 "); li.append(el("span",null,"— 세부 사실 Q&A")); ol.append(li);
+  box.append(ol); p.append(box);
+}
+function render(){
+  const p=$("paper"); p.replaceChildren();
+  const bn=$("banner").value.trim(); if(bn) p.append(el("div","banner",bn));
+  if(!post){ renderSkeleton(p); setBadge(); updateMeter(); return; }
+  const t=el("h2","ptitle"); editable(t,()=>post.title,v=>post.title=v); p.append(t);
+  const intro=el("p","body block"); editable(intro,()=>post.intro,v=>post.intro=v); p.append(intro);
+  post.sections.forEach((s,i)=>{
+    const b=el("div","block"); b.dataset.i=i;
+    const h=el("h3"); editable(h,()=>s.heading,v=>s.heading=v);
+    const body=el("p","body"); editable(body,()=>s.body,v=>s.body=v);
+    const tools=el("div","sec-tools");
+    const re=el("button","sm","이 단락 다시 쓰기"); re.type="button"; re.dataset.rw="1"; re.disabled=!ready||busy;
+    re.addEventListener("click",()=>rewriteSection(i,re));
+    const up=el("button","sm","↑"); up.type="button"; up.setAttribute("aria-label","위로 옮기기"); up.disabled=i===0;
+    up.addEventListener("click",()=>{ [post.sections[i-1],post.sections[i]]=[post.sections[i],post.sections[i-1]]; render(); });
+    const del=el("button","sm","삭제"); del.type="button"; del.addEventListener("click",()=>{ post.sections.splice(i,1); render(); runNumCheck(); });
+    tools.append(el("span","cnt"), el("span","todo"), re, up, del);
+    b.append(h,body,tools); p.append(b); refreshTools(b);
+  });
+  if(post.faq&&post.faq.length){
+    const f=el("div","faq"); const ft=el("p","faq-title"); editable(ft,()=>post.faqTitle||"Q. 알아두면 좋은 내용",v=>post.faqTitle=v); f.append(ft);
+    post.faq.forEach(it=>{ const q=el("p","q"); editable(q,()=>it.q,v=>it.q=v); const a=el("p","a"); editable(a,()=>it.a,v=>it.a=v); f.append(q,a); });
+    p.append(f);
+  }
+  const ct=$("contact").value.trim(); if(ct) p.append(el("div","contact",ct));
+  if(post.tags&&post.tags.length){ const tg=el("p","tags"); editable(tg,()=>post.tags.join(" "),v=>post.tags=v.split(/\s+/).filter(Boolean)); p.append(tg); }
+  setBadge(); updateMeter();
+}
+function setBadge(){
+  const b=$("badge");
+  if(!post){ b.textContent=`${MODES[effMode()].label} 유형 · 생성 전`; b.classList.remove("live"); return; }
+  b.textContent = isExample ? "예시 원고" : `${MODES[post.mode||"presale"].label} 원고 · 직접 수정 가능`;
+  b.classList.toggle("live",!isExample);
+}
+const allText = () => [post.title,post.intro,...post.sections.map(s=>s.heading+" "+s.body),...(post.faq||[]).map(f=>f.q+" "+f.a)].join("\n");
+function updateMeter(){
+  const m=$("meter"); m.replaceChildren(); if(!post) return;
+  const len=[post.intro,...post.sections.map(s=>s.heading+s.body),...(post.faq||[]).map(f=>f.q+f.a)].join("").length;
+  m.append(document.createTextNode(`소제목 ${post.sections.length}개 · 본문 ${len.toLocaleString()}자`));
+  const n=todoCount(allText()); if(n) m.append(el("span","todo",`확인필요 ${n}곳`));
+}
+
+/* ---------- 복사 ---------- */
+const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const BLANK="<p><br></p>";
+function buildHTML(){
+  const o=[], bn=$("banner").value.trim(), ct=$("contact").value.trim();
+  if(bn) o.push(`<p>${esc(bn).replace(/\n/g,"<br>")}</p>`,BLANK);
+  o.push(`<p>${esc(post.intro)}</p>`,BLANK,BLANK);
+  post.sections.forEach(s=>o.push(`<p><b><span style="font-size:19px;">${esc(s.heading)}</span></b></p>`,BLANK,`<p>${esc(s.body)}</p>`,BLANK,BLANK));
+  if(post.faq&&post.faq.length){ o.push(`<p><b><span style="font-size:19px;">${esc(post.faqTitle||"Q. 알아두면 좋은 내용")}</span></b></p>`,BLANK); post.faq.forEach(f=>o.push(`<p><b>${esc(f.q)}</b></p>`,BLANK,`<p>${esc(f.a)}</p>`,BLANK)); }
+  if(ct) o.push(`<p>${esc(ct).replace(/\n/g,"<br>")}</p>`,BLANK);
+  if(post.tags&&post.tags.length) o.push(`<p>${esc(post.tags.join(" "))}</p>`);
+  return o.join("");
+}
+function buildText(){
+  const o=[], bn=$("banner").value.trim(), ct=$("contact").value.trim();
+  if(bn) o.push(bn); o.push(post.intro);
+  post.sections.forEach(s=>o.push(s.heading+"\n\n"+s.body));
+  if(post.faq&&post.faq.length){ o.push(post.faqTitle||"Q. 알아두면 좋은 내용"); post.faq.forEach(f=>o.push(f.q+"\n\n"+f.a)); }
+  if(ct) o.push(ct); if(post.tags&&post.tags.length) o.push(post.tags.join(" "));
+  return o.join("\n\n\n");
+}
+function showFallback(t){ $("fallback").hidden=false; const ta=$("fallbackText"); ta.value=t; ta.focus(); ta.select(); }
+$("closeFallback").addEventListener("click",()=>{ $("fallback").hidden=true; });
+function flash(btn,msg){ const o=btn.dataset.label||btn.textContent; btn.dataset.label=o; btn.textContent=msg; setTimeout(()=>btn.textContent=o,1800); }
+function copyWarn(){
+  const n=todoCount(allText()), un=facts.filter(f=>!f.ok).length;
+  if(!isExample && (n||un)) setStatus(`복사됨. ${n?`[확인필요] ${n}곳, `:""}${un?`검증대 미확인 ${un}개`:""} 남아 있습니다.`, true);
+}
+$("copyTitle").addEventListener("click",e=>{ if(!post) return; const b=e.currentTarget; navigator.clipboard.writeText(post.title).then(()=>flash(b,"복사됨")).catch(()=>showFallback(post.title)); });
+$("copyPlain").addEventListener("click",e=>{ if(!post) return; const b=e.currentTarget,t=buildText(); navigator.clipboard.writeText(t).then(()=>{flash(b,"복사됨");copyWarn();}).catch(()=>showFallback(t)); });
+$("copyRich").addEventListener("click",e=>{
+  if(!post) return; const b=e.currentTarget, h=buildHTML(), t=buildText(); let pr;
+  try{ if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){ pr=navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([h],{type:"text/html"}),"text/plain":new Blob([t],{type:"text/plain"})})]); } else throw 0; }catch(err){ pr=Promise.reject(err); }
+  pr.then(()=>{flash(b,"복사됨 — 에디터에 붙여넣기");copyWarn();}).catch(()=>navigator.clipboard.writeText(t).then(()=>{flash(b,"텍스트로 복사됨");copyWarn();}).catch(()=>showFallback(t)));
+});
+
+/* ---------- 프롬프트 ---------- */
+function extractPrompt(srcMap){
+  return `너는 아파트 단지 홍보자료를 읽는 검수자다. 함께 보낸 이미지는 분양 홈페이지, 모집공고, 브로슈어, 입주 안내문, 시세 화면 등의 캡처다.
+이미지는 보낸 순서대로 각각 아래 '캡처 번호'에 해당한다(긴 캡처는 여러 조각으로 나뉘어 같은 번호가 반복된다): [${srcMap.join(", ")}]
+
+이미지에서 사실만 뽑아 JSON 하나로 답한다:
+{"complex":"단지명(보이면, 없으면 빈 문자열)","mode":"presale 또는 movein 또는 unknown","keywords":["검색 키워드 후보 최대 4개: 지역명+아파트, 역명+아파트 등"],"facts":[{"item":"항목","value":"값","src":캡처번호,"sure":true}]}
+
+[규칙]
+- item은 다음 중 하나: ${ITEMS.join(", ")}
+- value는 이미지에 적힌 숫자·명칭·날짜를 원문 그대로 옮긴다. 단위(세대, ㎡, 억, 만원, 대)를 빼지 않는다. 계획 사업은 '계획', '예정', '목표' 같은 원래 표현을 같이 적는다.
+- 한 항목에 여러 사실이 있으면 별도 객체로 나눠도 되고, ' / '로 이어도 된다. 가격·시세는 면적과 기준 시점을 같이 적는다.
+- 글자가 작거나 흐려 숫자를 확신할 수 없으면 sure를 false로 한다. 추측해서 채우지 않는다.
+- '최고', '프리미엄', '마지막 기회' 같은 홍보 수식어, 전화번호, 상담 안내는 뽑지 않는다.
+- mode: 청약·분양가·모집공고·입주 예정 위주면 presale, 입주 시작·입주지정기간·준공·매매/전세 시세 위주면 movein.
+- 이미지에 단지 정보가 없으면 facts를 빈 배열로 둔다.`;
+}
+function factsText(){
+  const lines = facts.filter(f=>String(f.value).trim()).map(f=>`- ${f.item}: ${f.value}${f.sure?"":" (판독 불확실 — 숫자는 쓰지 말 것)"}`);
+  const n=$("notes").value.trim(); if(n) lines.push("- 추가 메모: "+n.replace(/\n/g," / "));
+  return lines.join("\n");
+}
+function rules(o){
+  const m=MODES[o.mode]||MODES.presale, n=Number(o.sections), fq=Number(o.faqCount);
+  const voice = o.voice==="broker" ? "현장 중개사가 정리한 글처럼 쓰되 과장 없이 담백하게. 전체에서 2~3번 정도만 '현장에서 보면', '상담하다 보면' 같은 경험 표현을 넣는다." : "3인칭 정보 정리형. 글쓴이 개인 경험이나 감정 표현은 넣지 않는다.";
+  const gap = o.gap==="mark"
+    ? `- 자료에 없지만 이 유형의 글에 꼭 필요한 정보는 숫자나 이름을 지어내지 말고 그 자리에 [확인필요: 무엇] 형태로 남긴다. 자료에 근거가 있으면 [확인필요]를 쓰지 않는다.`
+    : `- 자료에 없는 항목의 단락은 쓰지 않고, 자료가 있는 항목을 나눠 단락 수를 채운다. 그래도 부족하면 일반적인 확인 포인트(실거래가 확인, 청약·계약 전 점검 사항 등)를 담은 단락으로 채운다. 이때도 구체적 숫자는 자료에 있는 것만 쓴다.`;
+  return `[글 유형] ${m.label} 단지 포스팅
+
+[문체·형식 규칙 — 반드시 지킬 것]
+1. 제목(title): 단지명을 맨 앞에 두고, 검색 키워드 1~2개와 핵심 소재를 쉼표로 이은 28~40자 한 줄. 이모지·특수기호 금지.
+2. 서론(intro): ${m.intro}
+3. 본문 소제목(sections): 정확히 ${n}개. 각 heading은 12~20자의 명사구. 단지명 반복·이모지·물음표 금지.
+4. 각 단락(body): 정확히 4문장, 150~230자. 어미는 '~입니다/~습니다'가 기본이고, 단락마다 '~요'로 끝나는 문장 1개와 '~는데요'로 끝나는 문장 1개를 섞는다. 첫 문장은 핵심 사실, 마지막 문장은 정리나 시사점.
+5. 단락 순서: ${m.order} 소제목 수가 ${n}개와 다르면 비슷한 항목을 합치거나 자료가 많은 항목을 나눠 맞추되 결론 단락은 항상 마지막에 둔다.
+6. Q&A(faq): ${fq>0?`정확히 ${fq}개. q는 "Q1. ~나요?/~인가요?" 형식, a는 1~2문장. ${m.faq}을 묻고 답한다. 자료에 근거가 없는 질문은 만들지 않는다.`:"만들지 않는다(빈 배열)."}
+7. 태그(tags): '#'으로 시작, 띄어쓰기 없이 3~5개. 첫 태그는 단지명(띄어쓰기 제거).
+8. 시점: ${voice}
+
+[사실·광고 규칙]
+- 숫자·명칭·일정은 자료에 있는 것만, 자료에 적힌 그대로 쓴다. 자료에 없는 숫자·시설·학교명·브랜드를 지어내지 않는다. 숫자를 반올림하거나 합산해 새 숫자를 만들지 않는다.
+- '판독 불확실'로 표시된 항목의 숫자는 쓰지 않는다.
+${gap}
+- 계획 단계 사업은 '계획', '예정', '목표', '자료상'으로 표현하고 확정된 것처럼 쓰지 않는다.
+- '무조건', '최고', '대박', '프리미엄 확정', '수익 보장', '시세 상승 확실' 같은 단정·과장 표현은 쓰지 않는다.
+${m.extra}`;
+}
+function writePrompt(o){
+  return `너는 네이버 블로그·카페용 부동산 정보 글을 쓰는 작가다. 아래 자료로 아파트 단지 분석 포스팅을 쓴다.
+
+[단지명] ${o.complex}
+[검색 키워드] ${o.keywords||"(없음)"}
+[자료]
+${factsText()}
+
+${rules(o)}
+
+[출력] 다른 말 없이 JSON 하나만:
+{"title":"...","intro":"...","sections":[{"heading":"...","body":"..."}],"faqTitle":"Q. 알아두면 좋은 내용","faq":[{"q":"Q1. ...","a":"..."}],"tags":["#..."]}`;
+}
+function rewritePrompt(o,i){
+  const ctx={title:post.title,intro:post.intro,sections:post.sections.map((s,k)=>({no:k+1,heading:s.heading,body:s.body}))};
+  return `아래 단지 분석 포스팅의 ${i+1}번째 단락만 새로 쓴다. 같은 주제를 다루되 문장 구성과 표현을 바꾸고, 다른 단락과 내용이 겹치지 않게 한다.
+
+[단지명] ${o.complex}
+[자료]
+${factsText()}
+
+[현재 글]
+${JSON.stringify(ctx)}
+
+${rules(o)}
+
+[출력] 다른 말 없이 JSON 하나만: {"heading":"...","body":"..."}`;
+}
+
+/* ---------- 실행 ---------- */
+const ERR={
+  auth:"비밀번호가 맞지 않습니다.",
+  server_config:"서버 설정이 빠졌습니다. Vercel 환경변수 ANTHROPIC_API_KEY와 APP_PASSWORD를 확인해 주세요.",
+  api_key:"Anthropic API 키가 맞지 않거나 사용 한도를 넘었습니다. Vercel 환경변수와 Anthropic 콘솔의 결제 상태를 확인해 주세요.",
+  timeout:"처리 시간이 너무 길어 끊겼습니다. 캡처 수를 줄여 다시 시도해 주세요.",
+  network:"인터넷 연결을 확인해 주세요.",
+  rate_limited:"AI 서버가 바빠 잠시 막혔습니다. 1~2분 뒤 다시 눌러주세요.",
+  prompt_too_large:"자료가 너무 많습니다. 캡처 수를 줄여 다시 시도해 주세요.",
+  invalid_json:"결과 형식이 맞지 않았습니다. 한 번 더 눌러주세요.",
+  refused:"이 자료로는 작업하지 못했습니다. 다른 캡처로 시도해 주세요.",
+  image_rejected:"읽지 못한 캡처가 있습니다. JPG·PNG로 다시 캡처해 주세요.",
+  images_unavailable:"이 화면에서는 이미지를 읽을 수 없습니다. 텍스트 자료로 진행해 주세요.",
+  empty_completion:"결과가 비어 돌아왔습니다. 다시 눌러주세요."
+};
+const errMsg=e=>ERR[e&&e.code]||"연결이 잠시 끊겼습니다. 다시 눌러주세요.";
+function setStatus(t,err){ const s=$("status"); s.textContent=t; s.classList.toggle("err",!!err); }
+function stepMark(k,state){ document.querySelectorAll(".step").forEach(s=>{ if(s.dataset.s===k){ s.classList.remove("on","done"); if(state) s.classList.add(state); } }); }
+function stepsReset(){ document.querySelectorAll(".step").forEach(s=>s.classList.remove("on","done")); }
+function setBusy(b){
+  busy=b; $("goBtn").disabled=b||!ready; $("stopBtn").hidden=!b;
+  $("rewriteAll").disabled = b||!ready||!facts.length||isExample&&!factsEdited;
+  document.querySelectorAll("button[data-rw]").forEach(x=>x.disabled=b||!ready);
+}
+function handleErr(e){
+  if(e&&e.code==="cancelled") setStatus("중지했습니다."); else setStatus(errMsg(e),true);
+  if(e&&e.code==="auth"){ lockApp("비밀번호가 바뀌었거나 맞지 않습니다. 다시 입력해 주세요."); }
+}
+function opts(){ const o={mode:effMode(),complex:$("complex").value.trim(),keywords:$("keywords").value.trim()}; OPT_IDS.forEach(id=>o[id]=$(id).value); return o; }
+
+async function readCaptures(signal){
+  const tiles=[], map=[];
+  for(let k=0;k<images.length;k++){
+    const ts = await toTiles(images[k].file);
+    ts.forEach(t=>{ tiles.push(t); map.push(k+1); });
+  }
+  const per = Math.max(1, imgLimits ? imgLimits.maxCount : 5);
+  const MAX_TILES = per*8;
+  if(tiles.length>MAX_TILES){ tiles.length=MAX_TILES; map.length=MAX_TILES; setStatus(`캡처 조각이 많아 앞쪽 ${MAX_TILES}조각만 읽습니다.`); }
+  const batches=[]; for(let i=0;i<tiles.length;i+=per) batches.push([tiles.slice(i,i+per), map.slice(i,i+per)]);
+  const got={complex:"",modes:{},keywords:[],facts:[]};
+  for(let b=0;b<batches.length;b++){
+    setStatus(`캡처 읽는 중… ${b+1}/${batches.length}묶음 (묶음당 20~60초)`);
+    const [imgs,srcMap]=batches[b];
+    const r = await ask(extractPrompt(srcMap), {images:imgs, signal, json:true, maxTokens:8000});
+    if(!r || typeof r!=="object") continue;
+    if(!got.complex && r.complex) got.complex=String(r.complex).trim();
+    if(r.mode==="presale"||r.mode==="movein") got.modes[r.mode]=(got.modes[r.mode]||0)+1;
+    (Array.isArray(r.keywords)?r.keywords:[]).forEach(k=>{ k=String(k).trim(); if(k && !got.keywords.includes(k)) got.keywords.push(k); });
+    (Array.isArray(r.facts)?r.facts:[]).forEach(f=>{
+      if(!f||!f.value) return; const v=String(f.value).trim(), it=ITEMS.includes(f.item)?f.item:"기타";
+      if(got.facts.some(x=>x.item===it&&x.value===v)) return;
+      const src=Number(f.src); got.facts.push({id:"f"+(++seq),item:it,value:v,src:(src>=1&&src<=images.length)?src:-1,sure:f.sure!==false,ok:false});
+    });
+  }
+  return got;
+}
+
+async function writePost(signal){
+  const o=opts();
+  if(!o.complex){ throw {code:"_nocomplex"}; }
+  const t0=Date.now(); setStatus("글 쓰는 중… (보통 30초~1분)");
+  const tick=setInterval(()=>setStatus(`글 쓰는 중… ${Math.round((Date.now()-t0)/1000)}초`),1000);
+  let res; try{ res = await ask(writePrompt(o), {signal, json:true, maxTokens:8000}); } finally{ clearInterval(tick); }
+  if(!res||typeof res.title!=="string"||!Array.isArray(res.sections)||!res.sections.length) throw {code:"invalid_json"};
+  post={ mode:o.mode, title:res.title.trim(), intro:String(res.intro||"").trim(),
+    sections:res.sections.filter(s=>s&&s.body).map(s=>({heading:String(s.heading||"").trim(),body:String(s.body).trim()})),
+    faqTitle:String(res.faqTitle||"Q. 알아두면 좋은 내용").trim(),
+    faq:Array.isArray(res.faq)?res.faq.filter(f=>f&&f.q&&f.a).map(f=>({q:String(f.q).trim(),a:String(f.a).trim()})):[],
+    tags:Array.isArray(res.tags)?res.tags.map(t=>{t=String(t).replace(/\s+/g,"");return t.startsWith("#")?t:"#"+t;}):[] };
+  isExample=false; factsEdited=false; render(); runNumCheck(); saveHistory(o);
+}
+
+$("form").addEventListener("submit", async e=>{
+  e.preventDefault(); if(!ready||busy) return;
+  const hasNotes=$("notes").value.trim().length>20;
+  if(!images.length && !hasNotes && (isExample||!facts.length)){ setStatus("홍보자료 캡처를 먼저 넣어주세요. 끌어다 놓거나 Ctrl+V로 붙여넣으면 됩니다.",true); drop.focus(); return; }
+  ctl=new AbortController(); setBusy(true); stepsReset();
+  try{
+    if(images.length && factsStale){
+      stepMark("read","on");
+      const got = await readCaptures(ctl.signal);
+      if(!got.facts.length && !hasNotes){ setStatus("캡처에서 단지 정보를 찾지 못했습니다. 단지 개요나 분양 안내가 보이는 화면을 캡처해 주세요.",true); stepsReset(); return; }
+      if(isExample){ $("complex").value=""; $("keywords").value=""; }
+      facts = got.facts; isExample=false; factsStale=false;
+      if(got.complex) $("complex").value=got.complex;
+      if(got.keywords.length && !$("keywords").value.trim()) $("keywords").value=got.keywords.slice(0,3).join(", ");
+      const pm=got.modes.presale||0, mm=got.modes.movein||0; if(pm||mm) detectedMode = mm>pm ? "movein" : "presale";
+      updateModeHint(); renderFacts(); stepMark("read","done");
+    } else if(isExample){
+      facts=[]; isExample=false; $("complex").value=""; renderFacts();
+    }
+    if(!$("complex").value.trim()){ setStatus("단지명을 찾지 못했습니다. 검증대의 단지명 칸에 적고 ‘고친 자료로 다시 쓰기’를 누르세요.",true); $("complex").focus(); return; }
+    stepMark("write","on");
+    await writePost(ctl.signal);
+    stepMark("write","done");
+    const un=facts.filter(f=>!f.sure).length, n=todoCount(allText());
+    setStatus(`완료 — 검증대의 값${un?`(불확실 ${un}개 포함)`:""}과 숫자 대조 결과를 확인하세요.${n?` [확인필요] ${n}곳이 있습니다.`:""}`);
+  }catch(err){ handleErr(err); }
+  finally{ setBusy(false); }
+});
+$("rewriteAll").addEventListener("click", async ()=>{
+  if(!ready||busy) return;
+  if(!$("complex").value.trim()){ setStatus("단지명을 적어주세요.",true); $("complex").focus(); return; }
+  ctl=new AbortController(); setBusy(true); stepMark("write","on");
+  try{ await writePost(ctl.signal); stepMark("write","done"); setStatus("고친 자료로 다시 썼습니다."); }
+  catch(err){ handleErr(err); } finally{ setBusy(false); }
+});
+$("stopBtn").addEventListener("click",()=>ctl&&ctl.abort());
+
+async function rewriteSection(i,btn){
+  if(!ready||busy) return;
+  const o=opts(); o.mode=post.mode||o.mode;
+  ctl=new AbortController(); setBusy(true); btn.textContent="다시 쓰는 중…"; setStatus(`${i+1}번째 단락을 다시 쓰는 중…`);
+  try{
+    const r=await ask(rewritePrompt(o,i),{signal:ctl.signal,json:true,maxTokens:3000});
+    if(!r||typeof r.body!=="string") throw {code:"invalid_json"};
+    post.sections[i]={heading:String(r.heading||post.sections[i].heading).trim(),body:r.body.trim()};
+    isExample=false; render(); runNumCheck(); setStatus(`${i+1}번째 단락을 바꿨습니다.`);
+  }catch(err){ handleErr(err); render(); } finally{ setBusy(false); }
+}
+
+$("resetBtn").addEventListener("click",()=>{
+  if(busy) return;
+  images.forEach(im=>URL.revokeObjectURL(im.url)); images=[]; renderThumbs();
+  facts=[]; post=null; isExample=false; factsStale=true; factsEdited=false; detectedMode="presale";
+  $("complex").value=""; $("keywords").value=""; $("notes").value="";
+  stepsReset(); $("numcheck").hidden=true; updateModeHint(); renderFacts(); render(); setBusy(false);
+  setStatus("새 단지를 시작합니다. 캡처를 넣어주세요."); drop.focus();
+});
+
+/* ---------- 기록 ---------- */
+function saveHistory(o){
+  const h=store.get(HKEY)||[];
+  h.unshift({at:Date.now(),opts:o,post,facts:facts.map(f=>({...f,src:-1})),notes:$("notes").value});
+  store.set(HKEY,h.slice(0,12)); renderHistory();
+}
+function renderHistory(){
+  const box=$("hist"); box.replaceChildren(); const h=store.get(HKEY)||[];
+  if(!h.length){ box.append(el("span","hint","생성한 글이 이 브라우저에 최근 12개까지 남습니다. 캡처 이미지는 저장되지 않습니다.")); return; }
+  h.forEach(it=>{
+    const b=el("button"); b.type="button"; const d=new Date(it.at); const l=el("span");
+    l.append(el("span","tag",MODES[(it.post&&it.post.mode)||"presale"].label)); l.append(document.createTextNode(it.post.title.slice(0,28)));
+    b.append(l, el("time",null,`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`));
+    b.addEventListener("click",()=>{
+      post=JSON.parse(JSON.stringify(it.post)); facts=JSON.parse(JSON.stringify(it.facts||[])); isExample=false; factsStale=true;
+      $("complex").value=it.opts.complex||""; $("keywords").value=it.opts.keywords||""; $("notes").value=it.notes||"";
+      renderFacts(); render(); runNumCheck(); setBusy(false); setStatus("기록에서 불러왔습니다.");
+    });
+    box.append(b);
+  });
+}
+
+/* ---------- 시작 ---------- */
+updateModeHint(); renderThumbs(); renderFacts(); render(); renderHistory();
+$("goBtn").disabled=true; setStatus("연결 확인 중…");
+/* ---------- 서버 호출 ---------- */
+let appKey = (()=>{ try{ return localStorage.getItem(AKEY)||""; }catch(e){ return ""; } })();
+async function toB64(blob){
+  // 긴 변 1568px 이하 JPEG로 맞춤 (요청 용량 4.5MB 한도 안에 들도록)
+  let bmp=null; try{ bmp=await createImageBitmap(blob); }catch(e){}
+  let out=blob;
+  if(bmp){
+    const sc=Math.min(1, 1568/Math.max(bmp.width,bmp.height));
+    const w=Math.round(bmp.width*sc), h=Math.round(bmp.height*sc);
+    const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+    const cx=cv.getContext("2d"); cx.fillStyle="#fff"; cx.fillRect(0,0,w,h); cx.drawImage(bmp,0,0,w,h);
+    bmp.close&&bmp.close();
+    out = await new Promise(r=>cv.toBlob(r,"image/jpeg",0.85)) || blob;
+  }
+  const data = await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(String(fr.result).split(",")[1]||""); fr.onerror=rej; fr.readAsDataURL(out); });
+  return {type: out.type && /^image\/(jpeg|png|gif|webp)$/.test(out.type) ? out.type : "image/jpeg", data};
+}
+function parseJSON(t){
+  const tryP=x=>{ try{ return JSON.parse(x); }catch(e){ return undefined; } };
+  let v=tryP(t.trim()); if(v!==undefined) return v;
+  const f=t.match(/```(?:json)?\s*([\s\S]*?)```/); if(f){ v=tryP(f[1].trim()); if(v!==undefined) return v; }
+  const a=t.search(/[\[{]/), b=Math.max(t.lastIndexOf("}"),t.lastIndexOf("]"));
+  if(a>=0&&b>a){ v=tryP(t.slice(a,b+1)); if(v!==undefined) return v; }
+  return undefined;
+}
+async function callApi(body, signal, key){
+  let r;
+  try{ r=await fetch("/api/claude",{method:"POST",headers:{"content-type":"application/json","x-app-key":key||appKey},body:JSON.stringify(body),signal}); }
+  catch(e){ if(e&&e.name==="AbortError") throw {code:"cancelled"}; throw {code:"network"}; }
+  let d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok) throw {code: d.code || (r.status===401?"auth":r.status===413?"prompt_too_large":r.status===429?"rate_limited":r.status===504?"timeout":"upstream_error"), message:d.message||""};
+  return d;
+}
+async function ask(prompt,{images=[],signal,json=false,maxTokens=8000}={}){
+  const imgs=[]; for(const b of images) imgs.push(await toB64(b));
+  if(signal&&signal.aborted) throw {code:"cancelled"};
+  const d = await callApi({prompt,images:imgs,maxTokens}, signal);
+  const text=String(d.text||"");
+  if(!text.trim()) throw {code:"empty_completion"};
+  if(!json) return {text, truncated:d.stop_reason==="max_tokens"};
+  const v=parseJSON(text); if(v===undefined) throw {code:"invalid_json", text};
+  return v;
+}
+function unlockApp(){
+  ready=true; $("gate").hidden=true; $("lockBtn").hidden=false; $("noSample").hidden=true;
+  setStatus("캡처를 넣고 ‘분석하고 포스팅 쓰기’를 누르세요."); setBusy(false); render();
+}
+function lockApp(msg){
+  ready=false; appKey=""; try{ localStorage.removeItem(AKEY); }catch(e){}
+  $("gate").hidden=false; $("lockBtn").hidden=true;
+  const m=$("gateMsg"); m.textContent=msg||"사무소 비밀번호를 입력해 주세요."; m.classList.toggle("err",!!msg);
+  setBusy(false); $("goBtn").disabled=true; $("pw").focus();
+}
+$("lockBtn").addEventListener("click",()=>lockApp());
+$("gate").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const k=$("pw").value.trim(); if(!k){ $("pw").focus(); return; }
+  $("pwBtn").disabled=true; $("gateMsg").textContent="확인 중…"; $("gateMsg").classList.remove("err");
+  try{ await callApi({ping:true}, undefined, k); appKey=k; try{ localStorage.setItem(AKEY,k); }catch(e){} $("pw").value=""; unlockApp(); }
+  catch(err){ const m=$("gateMsg"); m.textContent=errMsg(err); m.classList.add("err"); }
+  finally{ $("pwBtn").disabled=false; }
+});
+(async()=>{
+  if(!appKey){ lockApp(); setStatus(""); return; }
+  try{ await callApi({ping:true}); unlockApp(); }
+  catch(err){
+    if(err.code==="auth") lockApp("비밀번호가 바뀌었습니다. 다시 입력해 주세요.");
+    else { $("noSample").hidden=false; $("noSample").textContent=errMsg(err); ready=false; setStatus(""); $("goBtn").disabled=true; }
+  }
+})();
+})();
+</script>
+</body>
+</html>

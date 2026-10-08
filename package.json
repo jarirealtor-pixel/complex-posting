@@ -1,0 +1,7 @@
+{
+  "name": "complex-posting",
+  "private": true,
+  "type": "module",
+  "description": "단지분석 포스팅 생성기 — 홍보자료 캡처로 분양·입주 단지 포스팅 작성",
+  "engines": { "node": ">=20" }
+}
